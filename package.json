@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:email": "node --test test/notify_parents_test.ts"
+  }
+}
