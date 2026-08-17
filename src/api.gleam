@@ -206,3 +206,28 @@ pub fn notify_parents(
 ) -> effect.Effect(msg) {
   supabase.post_with_auth("/functions/v1/notify-parents", jwt, "{}", message)
 }
+
+// -----------------------------------------------------------------------------
+// Add Family
+// -----------------------------------------------------------------------------
+
+pub fn add_family(
+  p_family_email: String,
+  message: fn(Result(String, rsvp.Error(String))) -> msg,
+) -> effect.Effect(msg) {
+  let body =
+    json.object([
+      #("p_family_email", json.string(p_family_email)),
+    ])
+
+  supabase.post_json(
+    "/rest/v1/rpc/add_family",
+    json.to_string(body),
+    add_family_decoder(),
+    message,
+  )
+}
+
+pub fn add_family_decoder() -> decode.Decoder(String) {
+  decode.string
+}
