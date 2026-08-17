@@ -423,7 +423,7 @@ fn view_login(email: String, password: String, error: option.Option(String)) {
 fn view_dashboard(
   roster: List(AdminRow),
   results: List(ResultRow),
-  _management: ManagementForm,
+  management: ManagementForm,
   notice: option.Option(String),
   filter_text: String,
   busy: Bool,
@@ -490,6 +490,7 @@ fn view_dashboard(
       None -> html.text("")
     },
     view_results(results),
+    view_family_management(management, busy),
     html.section([attribute.class("panel")], [
       html.h3([], [html.text("Roster")]),
       html.input([
@@ -512,6 +513,18 @@ fn view_dashboard(
           html.tbody([], list.map(filtered, view_roster_row)),
         ]),
       ]),
+    ]),
+  ])
+}
+
+fn view_family_management(
+  //families: List(AdminFamily),
+  _management: ManagementForm,
+  _busy: Bool,
+) {
+  html.section([attribute.class("panel family-management")], [
+    html.div([attribute.class("family-management-head")], [
+      html.div([], [html.h3([], [html.text("Families")])]),
     ]),
   ])
 }
