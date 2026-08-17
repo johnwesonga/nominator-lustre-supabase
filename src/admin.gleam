@@ -19,10 +19,19 @@ pub type State {
     jwt: String,
     roster: List(AdminRow),
     results: List(ResultRow),
+    management: ManagementForm,
     notice: option.Option(String),
     filter_text: String,
     busy: Bool,
   )
+}
+
+pub type ManagementMode {
+  NewFamily
+}
+
+pub type ManagementForm {
+  ManagementForm(mode: ManagementMode, email: String)
 }
 
 pub type Msg {
@@ -98,19 +107,28 @@ pub fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
     GotResults(result) -> got_results(state, result)
     FilterInput(text) ->
       case state {
-        LoggedIn(jwt, roster, results, notice, _, busy) -> #(
-          LoggedIn(jwt:, roster:, results:, notice:, filter_text: text, busy:),
+        LoggedIn(jwt, roster, results, management, notice, _, busy) -> #(
+          LoggedIn(
+            jwt:,
+            roster:,
+            results:,
+            management:,
+            notice:,
+            filter_text: text,
+            busy:,
+          ),
           effect.none(),
         )
         _ -> #(state, effect.none())
       }
     Refresh ->
       case state {
-        LoggedIn(jwt, roster, results, _, filter_text, _) -> #(
+        LoggedIn(jwt, roster, results, management, _, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            management:,
             notice: None,
             filter_text:,
             busy: True,
@@ -121,11 +139,12 @@ pub fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
       }
     SetVoting(open) ->
       case state {
-        LoggedIn(jwt, roster, results, _, filter_text, _) -> #(
+        LoggedIn(jwt, roster, results, management, _, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            management:,
             notice: None,
             filter_text:,
             busy: True,
@@ -143,11 +162,12 @@ pub fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
       })
     NotifyParents ->
       case state {
-        LoggedIn(jwt, roster, results, _, filter_text, _) -> #(
+        LoggedIn(jwt, roster, results, management, _, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            management:,
             notice: None,
             filter_text:,
             busy: True,
@@ -160,6 +180,10 @@ pub fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
       finish_action(state, result, "Parent notification request completed.")
     LogOut -> init()
   }
+}
+
+fn new_management() -> ManagementForm {
+  ManagementForm(NewFamily, "")
 }
 
 fn logged_out_email(state: State) -> String {
@@ -193,11 +217,12 @@ fn got_roster(
           ),
           effect.none(),
         )
-        LoggedIn(jwt, roster, results, _, filter_text, _) -> #(
+        LoggedIn(jwt, roster, results, management, _, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            management:,
             notice: Some("Refresh failed. Please try again."),
             filter_text:,
             busy: False,
@@ -213,17 +238,19 @@ fn got_roster(
             jwt:,
             roster: loaded_roster,
             results: [],
+            management: new_management(),
             notice: None,
             filter_text: "",
             busy: False,
           ),
           effect.none(),
         )
-        LoggedIn(jwt, _, results, notice, filter_text, _) -> #(
+        LoggedIn(jwt, _, results, management, notice, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster: loaded_roster,
             results:,
+            management:,
             notice:,
             filter_text:,
             busy: False,
@@ -252,11 +279,12 @@ fn got_results(
           ),
           effect.none(),
         )
-        LoggedIn(jwt, roster, results, _, filter_text, _) -> #(
+        LoggedIn(jwt, roster, results, management, _, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            management:,
             notice: Some("Refresh failed. Please try again."),
             filter_text:,
             busy: False,
@@ -272,14 +300,23 @@ fn got_results(
             jwt:,
             roster: [],
             results:,
+            management: new_management(),
             notice: None,
             filter_text: "",
             busy: False,
           ),
           effect.none(),
         )
-        LoggedIn(jwt, roster, _, notice, filter_text, _) -> #(
-          LoggedIn(jwt:, roster:, results:, notice:, filter_text:, busy: False),
+        LoggedIn(jwt, roster, _, management, notice, filter_text, _) -> #(
+          LoggedIn(
+            jwt:,
+            roster:,
+            results:,
+            management:,
+            notice:,
+            filter_text:,
+            busy: False,
+          ),
           effect.none(),
         )
         _ -> #(state, effect.none())
@@ -293,7 +330,7 @@ fn finish_action(
   success: String,
 ) {
   case state {
-    LoggedIn(jwt, roster, results, _, filter_text, _) -> {
+    LoggedIn(jwt, roster, results, management, _, filter_text, _) -> {
       let notice = case result {
         Ok(_) -> success
         Error(_) -> "The action failed. Please try again."
@@ -303,6 +340,7 @@ fn finish_action(
           jwt:,
           roster:,
           results:,
+          management:,
           notice: Some(notice),
           filter_text:,
           busy: False,
@@ -319,8 +357,8 @@ pub fn view(state: State) -> element.Element(Msg) {
     case state {
       LoggedOut(email, password, error) -> view_login(email, password, error)
       LoadingDashboard(_) -> html.p([], [html.text("Loading dashboard...")])
-      LoggedIn(_, roster, results, notice, filter_text, busy) ->
-        view_dashboard(roster, results, notice, filter_text, busy)
+      LoggedIn(_, roster, results, management, notice, filter_text, busy) ->
+        view_dashboard(roster, results, management, notice, filter_text, busy)
     },
   ])
 }
@@ -362,6 +400,7 @@ fn view_login(email: String, password: String, error: option.Option(String)) {
 fn view_dashboard(
   roster: List(AdminRow),
   results: List(ResultRow),
+  _management: ManagementForm,
   notice: option.Option(String),
   filter_text: String,
   busy: Bool,

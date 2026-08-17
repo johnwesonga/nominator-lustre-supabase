@@ -9,6 +9,7 @@ fn logged_in_state(busy: Bool) -> admin.State {
     jwt: "admin-jwt",
     roster: [],
     results: [],
+    management: admin.ManagementForm(admin.NewFamily, ""),
     notice: None,
     filter_text: "",
     busy:,
@@ -114,7 +115,7 @@ pub fn admin_roster_is_kept_when_results_arrive_first_test() {
   let #(after_roster, _) =
     admin.update(after_results, admin.GotRoster(Ok([roster_row])))
 
-  let assert admin.LoggedIn(_, roster, results, _, _, _) = after_roster
+  let assert admin.LoggedIn(_, roster, results, _, _, _, _) = after_roster
   roster |> should.equal([roster_row])
   results |> should.equal([result_row])
 }
@@ -123,7 +124,7 @@ pub fn set_voting_open_handles_success_test() {
   let state = logged_in_state(True)
   let #(updated, _) = admin.update(state, admin.VotingUpdated(True, Ok(Nil)))
 
-  let assert admin.LoggedIn(_, _, _, notice, _, busy) = updated
+  let assert admin.LoggedIn(_, _, _, _, notice, _, busy) = updated
   notice |> should.equal(Some("Voting is open."))
   busy |> should.be_false
 }
@@ -132,7 +133,7 @@ pub fn notify_parents_handles_success_and_failure_test() {
   let state = logged_in_state(True)
 
   let #(succeeded, _) = admin.update(state, admin.ParentsNotified(Ok(Nil)))
-  let assert admin.LoggedIn(_, _, _, success_notice, _, success_busy) =
+  let assert admin.LoggedIn(_, _, _, _, success_notice, _, success_busy) =
     succeeded
   success_notice
   |> should.equal(Some("Parent notification request completed."))
@@ -140,7 +141,8 @@ pub fn notify_parents_handles_success_and_failure_test() {
 
   let #(failed, _) =
     admin.update(state, admin.ParentsNotified(Error(rsvp.NetworkError)))
-  let assert admin.LoggedIn(_, _, _, failure_notice, _, failure_busy) = failed
+  let assert admin.LoggedIn(_, _, _, _, failure_notice, _, failure_busy) =
+    failed
   failure_notice |> should.equal(Some("The action failed. Please try again."))
   failure_busy |> should.be_false
 }
