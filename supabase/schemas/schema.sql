@@ -214,6 +214,57 @@ begin
 end;
 $$;
 
+-- ---------- Admin: list families ----------
+-- Returns one row per family with its swimmers nested as JSON. Families with
+-- no swimmers are included with an empty swimmers array.
+create or replace function get_admin_families()
+returns table (
+  id uuid,
+  email text,
+  family_token uuid,
+  created_at timestamptz,
+  swimmers jsonb
+)
+language plpgsql
+security definer
+stable
+set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  return query
+    select
+      family.id,
+      family.email,
+      family.family_token,
+      family.created_at,
+      coalesce(
+        jsonb_agg(
+          jsonb_build_object(
+            'id', swimmer.id,
+            'name', swimmer.name,
+            'group_name', swimmer.group_name,
+            'created_at', swimmer.created_at,
+            'has_voted', swimmer.has_voted
+          )
+          order by swimmer.name
+        ) filter (where swimmer.id is not null),
+        '[]'::jsonb
+      ) as swimmers
+    from public.families as family
+    left join public.swimmers as swimmer on swimmer.family_id = family.id
+    group by
+      family.id,
+      family.email,
+      family.family_token,
+      family.created_at
+    order by family.email;
+end;
+$$;
+
 -- ---------- Admin: full family/swimmer roster, for support & re-sending links ----------
 create or replace function get_admin_roster()
 returns table (
@@ -239,6 +290,8 @@ grant execute on function get_results() to authenticated;
 grant execute on function set_voting_open(boolean) to authenticated;
 revoke execute on function add_family(text) from public, anon;
 grant execute on function add_family(text) to authenticated;
+revoke execute on function get_admin_families() from public, anon;
+grant execute on function get_admin_families() to authenticated;
 grant execute on function get_admin_roster() to authenticated;
 
 -- No direct grants on families, swimmers, votes, voting_settings: RLS with

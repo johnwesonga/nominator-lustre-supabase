@@ -5,7 +5,7 @@ import lustre/effect
 import rsvp
 import supabase
 
-import types.{type AdminRow, type Candidate, type ResultRow}
+import types.{type AdminFamily, type AdminRow, type Candidate, type ResultRow}
 
 // -----------------------------------------------------------------------------
 // Family ballot
@@ -230,4 +230,21 @@ pub fn add_family(
 
 pub fn add_family_decoder() -> decode.Decoder(String) {
   decode.string
+}
+
+// -----------------------------------------------------------------------------
+// Get Admin Families
+// -----------------------------------------------------------------------------
+pub fn get_admin_families(
+  message: fn(Result(List(AdminFamily), rsvp.Error(String))) -> msg,
+) -> effect.Effect(msg) {
+  supabase.get_json(
+    "/rest/v1/rpc/get_admin_families",
+    admin_family_decoder(),
+    message,
+  )
+}
+
+pub fn admin_family_decoder() -> decode.Decoder(List(AdminFamily)) {
+  types.admin_family_list_decoder()
 }
