@@ -180,6 +180,40 @@ begin
 end;
 $$;
 
+-- ---------- Admin: add a family ----------
+-- Creates one family record and returns the generated id and voting token.
+-- Email addresses are normalized so case and surrounding whitespace do not
+-- create duplicate family records.
+create or replace function add_family(family_email text)
+returns table (
+  family_id uuid,
+  family_email text,
+  family_token uuid
+)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  normalized_email text := lower(trim(family_email));
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  if normalized_email is null
+    or normalized_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
+  then
+    raise exception 'invalid family email' using errcode = '22023';
+  end if;
+
+  return query
+    insert into public.families as family (email)
+    values (normalized_email)
+    returning family.id, family.email, family.family_token;
+end;
+$$;
+
 -- ---------- Admin: full family/swimmer roster, for support & re-sending links ----------
 create or replace function get_admin_roster()
 returns table (
@@ -203,6 +237,8 @@ grant execute on function get_family_ballot(uuid) to anon, authenticated;
 grant execute on function cast_vote(uuid, uuid, uuid) to anon, authenticated;
 grant execute on function get_results() to authenticated;
 grant execute on function set_voting_open(boolean) to authenticated;
+revoke execute on function add_family(text) from public, anon;
+grant execute on function add_family(text) to authenticated;
 grant execute on function get_admin_roster() to authenticated;
 
 -- No direct grants on families, swimmers, votes, voting_settings: RLS with
