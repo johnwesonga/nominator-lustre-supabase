@@ -184,7 +184,7 @@ $$;
 -- Creates one family record and returns the generated id and voting token.
 -- Email addresses are normalized so case and surrounding whitespace do not
 -- create duplicate family records.
-create or replace function add_family(family_email text)
+create or replace function add_family(p_family_email text)
 returns table (
   family_id uuid,
   family_email text,
@@ -195,7 +195,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  normalized_email text := lower(trim(family_email));
+  normalized_email text := lower(trim(p_family_email));
 begin
   if not public.is_admin() then
     raise exception 'not authorized' using errcode = '42501';
