@@ -100,3 +100,45 @@ pub type AdminState {
     filter_text: String,
   )
 }
+
+pub type AdminSwimmer {
+  AdminSwimmer(
+    id: String,
+    name: String,
+    group_name: option.Option(String),
+    created_at: String,
+    has_voted: Bool,
+  )
+}
+
+fn admin_swimmer_decoder() -> decode.Decoder(AdminSwimmer) {
+  use id <- decode.field("id", decode.string)
+  use name <- decode.field("name", decode.string)
+  use group_name <- decode.field("group_name", decode.optional(decode.string))
+  use created_at <- decode.field("created_at", decode.string)
+  use has_voted <- decode.field("has_voted", decode.bool)
+  decode.success(AdminSwimmer(id:, name:, group_name:, created_at:, has_voted:))
+}
+
+pub type AdminFamily {
+  AdminFamily(
+    id: String,
+    email: String,
+    family_token: String,
+    created_at: String,
+    swimmers: List(AdminSwimmer),
+  )
+}
+
+fn admin_family_decoder() -> decode.Decoder(AdminFamily) {
+  use id <- decode.field("id", decode.string)
+  use email <- decode.field("email", decode.string)
+  use family_token <- decode.field("family_token", decode.string)
+  use created_at <- decode.field("created_at", decode.string)
+  use swimmers <- decode.field("swimmers", decode.list(admin_swimmer_decoder()))
+  decode.success(AdminFamily(id:, email:, family_token:, created_at:, swimmers:))
+}
+
+pub fn admin_family_list_decoder() -> decode.Decoder(List(AdminFamily)) {
+  decode.list(admin_family_decoder())
+}
