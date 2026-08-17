@@ -48,6 +48,7 @@ pub type Msg {
   NotifyParents
   ParentsNotified(Result(Nil, rsvp.Error(String)))
   LogOut
+  StartNewFamily
 }
 
 pub fn init() -> #(State, effect.Effect(Msg)) {
@@ -179,11 +180,33 @@ pub fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
     ParentsNotified(result) ->
       finish_action(state, result, "Parent notification request completed.")
     LogOut -> init()
+    StartNewFamily -> set_management(state, ManagementForm(NewFamily, ""))
   }
 }
 
 fn new_management() -> ManagementForm {
   ManagementForm(NewFamily, "")
+}
+
+fn set_management(
+  state: State,
+  management: ManagementForm,
+) -> #(State, effect.Effect(Msg)) {
+  case state {
+    LoggedIn(jwt, roster, results, _, notice, filter_text, busy) -> #(
+      LoggedIn(
+        jwt:,
+        roster:,
+        results:,
+        management:,
+        notice:,
+        filter_text:,
+        busy:,
+      ),
+      effect.none(),
+    )
+    _ -> #(state, effect.none())
+  }
 }
 
 fn logged_out_email(state: State) -> String {
