@@ -297,8 +297,14 @@
   }
 
   .autocomplete .opt {
+      width: 100%;
       padding: 11px 14px;
       font-size: 14px;
+      font-family: inherit;
+      color: var(--ink);
+      text-align: left;
+      background: transparent;
+      border: 0;
       cursor: pointer;
       border-bottom: 1px solid var(--border);
       display: flex;
@@ -311,8 +317,14 @@
   }
 
   .autocomplete .opt:hover,
-  .autocomplete .opt.highlight {
+  .autocomplete .opt.highlight,
+  .autocomplete .opt:focus-visible {
       background: var(--surface);
+  }
+
+  .autocomplete .opt:focus-visible {
+      outline: 2px solid var(--pool-mid);
+      outline-offset: -2px;
   }
 
   .autocomplete .opt .grp {
@@ -438,6 +450,109 @@
       padding: 12px 14px;
       margin: -18px 0 22px;
       font-size: 13px;
+  }
+
+  .family-management-head,
+  .family-card-head,
+  .family-actions,
+  .management-actions,
+  .family-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+  }
+
+  .family-management-head,
+  .family-card-head {
+      justify-content: space-between;
+  }
+
+  .family-management-head p,
+  .family-card h4 {
+      margin: 0;
+  }
+
+  .management-form {
+      margin: 18px 0;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+  }
+
+  .management-form h4 {
+      margin: 0 0 12px;
+  }
+
+  .management-form label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+  }
+
+  .management-form input,
+  .family-link input {
+      width: 100%;
+      margin-top: 6px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font: inherit;
+  }
+
+  .management-fields {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+  }
+
+  .management-actions {
+      margin-top: 14px;
+  }
+
+  .family-list {
+      display: grid;
+      gap: 14px;
+  }
+
+  .family-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+  }
+
+  .family-link {
+      margin: 14px 0;
+  }
+
+  .family-link input {
+      margin-top: 0;
+      font-family: monospace;
+      font-size: 12px;
+  }
+
+  .family-swimmers ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 12px;
+  }
+
+  .family-swimmers li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+  }
+
+  .family-swimmers li .sub {
+      display: block;
+  }
+
+  .btn-small {
+      padding: 7px 10px;
+      font-size: 12px;
   }
 
   .table-wrap {
@@ -643,6 +758,26 @@
       .admin-head {
           flex-direction: column;
           align-items: flex-start;
+      }
+
+      .family-management-head,
+      .family-card-head,
+      .family-swimmers li {
+          align-items: stretch;
+          flex-direction: column;
+      }
+
+      .management-fields {
+          grid-template-columns: 1fr;
+      }
+
+      .family-link {
+          align-items: stretch;
+          flex-direction: column;
+      }
+
+      .family-actions {
+          flex-wrap: wrap;
       }
 
       table.roster {

@@ -10,7 +10,7 @@ import lustre/element
 import lustre/element/html
 import lustre/event
 import rsvp
-import types.{type AdminRow, type ResultRow, AdminRow}
+import types.{type AdminFamily, type AdminRow, type ResultRow, AdminRow}
 
 pub type State {
   LoggedOut(email: String, password: String, error: option.Option(String))
@@ -19,6 +19,7 @@ pub type State {
     jwt: String,
     roster: List(AdminRow),
     results: List(ResultRow),
+    families: List(AdminFamily),
     management: ManagementForm,
     notice: option.Option(String),
     filter_text: String,
@@ -41,6 +42,7 @@ pub type Msg {
   LoginResult(Result(String, rsvp.Error(String)))
   GotRoster(Result(List(AdminRow), rsvp.Error(String)))
   GotResults(Result(List(ResultRow), rsvp.Error(String)))
+  GotFamilies(Result(List(AdminFamily), rsvp.Error(String)))
   FilterInput(String)
   Refresh
   SetVoting(Bool)
@@ -106,13 +108,15 @@ pub fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
       }
     GotRoster(result) -> got_roster(state, result)
     GotResults(result) -> got_results(state, result)
+    GotFamilies(result) -> got_families(state, result)
     FilterInput(text) ->
       case state {
-        LoggedIn(jwt, roster, results, management, notice, _, busy) -> #(
+        LoggedIn(jwt, roster, results, families, management, notice, _, busy) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            families:,
             management:,
             notice:,
             filter_text: text,
@@ -124,11 +128,12 @@ pub fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
       }
     Refresh ->
       case state {
-        LoggedIn(jwt, roster, results, management, _, filter_text, _) -> #(
+        LoggedIn(jwt, roster, results, families, management, _, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            families:,
             management:,
             notice: None,
             filter_text:,
@@ -140,11 +145,12 @@ pub fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
       }
     SetVoting(open) ->
       case state {
-        LoggedIn(jwt, roster, results, management, _, filter_text, _) -> #(
+        LoggedIn(jwt, roster, results, families, management, _, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            families:,
             management:,
             notice: None,
             filter_text:,
@@ -163,11 +169,12 @@ pub fn update(state: State, msg: Msg) -> #(State, effect.Effect(Msg)) {
       })
     NotifyParents ->
       case state {
-        LoggedIn(jwt, roster, results, management, _, filter_text, _) -> #(
+        LoggedIn(jwt, roster, results, families, management, _, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            families:,
             management:,
             notice: None,
             filter_text:,
@@ -193,11 +200,12 @@ fn set_management(
   management: ManagementForm,
 ) -> #(State, effect.Effect(Msg)) {
   case state {
-    LoggedIn(jwt, roster, results, _, notice, filter_text, busy) -> #(
+    LoggedIn(jwt, roster, results, families, _, notice, filter_text, busy) -> #(
       LoggedIn(
         jwt:,
         roster:,
         results:,
+        families:,
         management:,
         notice:,
         filter_text:,
@@ -220,6 +228,7 @@ fn load_dashboard(jwt: String) -> effect.Effect(Msg) {
   effect.batch([
     api.get_admin_roster(jwt, GotRoster),
     api.get_results(jwt, GotResults),
+    api.get_admin_families(jwt, GotFamilies),
   ])
 }
 
@@ -240,11 +249,12 @@ fn got_roster(
           ),
           effect.none(),
         )
-        LoggedIn(jwt, roster, results, management, _, filter_text, _) -> #(
+        LoggedIn(jwt, roster, results, families, management, _, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            families:,
             management:,
             notice: Some("Refresh failed. Please try again."),
             filter_text:,
@@ -261,6 +271,7 @@ fn got_roster(
             jwt:,
             roster: loaded_roster,
             results: [],
+            families: [],
             management: new_management(),
             notice: None,
             filter_text: "",
@@ -268,11 +279,12 @@ fn got_roster(
           ),
           effect.none(),
         )
-        LoggedIn(jwt, _, results, management, notice, filter_text, _) -> #(
+        LoggedIn(jwt, _, results, families, management, notice, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster: loaded_roster,
             results:,
+            families:,
             management:,
             notice:,
             filter_text:,
@@ -302,11 +314,12 @@ fn got_results(
           ),
           effect.none(),
         )
-        LoggedIn(jwt, roster, results, management, _, filter_text, _) -> #(
+        LoggedIn(jwt, roster, results, families, management, _, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            families:,
             management:,
             notice: Some("Refresh failed. Please try again."),
             filter_text:,
@@ -323,6 +336,7 @@ fn got_results(
             jwt:,
             roster: [],
             results:,
+            families: [],
             management: new_management(),
             notice: None,
             filter_text: "",
@@ -330,11 +344,77 @@ fn got_results(
           ),
           effect.none(),
         )
-        LoggedIn(jwt, roster, _, management, notice, filter_text, _) -> #(
+        LoggedIn(jwt, roster, _, families, management, notice, filter_text, _) -> #(
           LoggedIn(
             jwt:,
             roster:,
             results:,
+            families:,
+            management:,
+            notice:,
+            filter_text:,
+            busy: False,
+          ),
+          effect.none(),
+        )
+        _ -> #(state, effect.none())
+      }
+  }
+}
+
+fn got_families(
+  state: State,
+  response: Result(List(AdminFamily), rsvp.Error(String)),
+) -> #(State, effect.Effect(Msg)) {
+  case response {
+    Error(_) ->
+      case state {
+        LoadingDashboard(_) -> #(
+          LoggedOut(
+            email: "",
+            password: "",
+            error: Some(
+              "Could not load the admin dashboard. Please sign in again.",
+            ),
+          ),
+          effect.none(),
+        )
+        LoggedIn(jwt, roster, results, families, management, _, filter_text, _) -> #(
+          LoggedIn(
+            jwt:,
+            roster:,
+            results:,
+            families:,
+            management:,
+            notice: Some("Refresh failed. Please try again."),
+            filter_text:,
+            busy: False,
+          ),
+          effect.none(),
+        )
+        _ -> #(state, effect.none())
+      }
+    Ok(families) ->
+      case state {
+        LoadingDashboard(jwt) -> #(
+          LoggedIn(
+            jwt:,
+            roster: [],
+            results: [],
+            families:,
+            management: new_management(),
+            notice: None,
+            filter_text: "",
+            busy: False,
+          ),
+          effect.none(),
+        )
+        LoggedIn(jwt, roster, results, _, management, notice, filter_text, _) -> #(
+          LoggedIn(
+            jwt:,
+            roster:,
+            results:,
+            families:,
             management:,
             notice:,
             filter_text:,
@@ -353,7 +433,7 @@ fn finish_action(
   success: String,
 ) {
   case state {
-    LoggedIn(jwt, roster, results, management, _, filter_text, _) -> {
+    LoggedIn(jwt, roster, results, families, management, _, filter_text, _) -> {
       let notice = case result {
         Ok(_) -> success
         Error(_) -> "The action failed. Please try again."
@@ -363,6 +443,7 @@ fn finish_action(
           jwt:,
           roster:,
           results:,
+          families:,
           management:,
           notice: Some(notice),
           filter_text:,
@@ -380,8 +461,25 @@ pub fn view(state: State) -> element.Element(Msg) {
     case state {
       LoggedOut(email, password, error) -> view_login(email, password, error)
       LoadingDashboard(_) -> html.p([], [html.text("Loading dashboard...")])
-      LoggedIn(_, roster, results, management, notice, filter_text, busy) ->
-        view_dashboard(roster, results, management, notice, filter_text, busy)
+      LoggedIn(
+        _,
+        roster,
+        results,
+        families,
+        management,
+        notice,
+        filter_text,
+        busy,
+      ) ->
+        view_dashboard(
+          roster,
+          results,
+          families,
+          management,
+          notice,
+          filter_text,
+          busy,
+        )
     },
   ])
 }
@@ -423,6 +521,7 @@ fn view_login(email: String, password: String, error: option.Option(String)) {
 fn view_dashboard(
   roster: List(AdminRow),
   results: List(ResultRow),
+  families: List(AdminFamily),
   management: ManagementForm,
   notice: option.Option(String),
   filter_text: String,
@@ -490,7 +589,7 @@ fn view_dashboard(
       None -> html.text("")
     },
     view_results(results),
-    view_family_management(management, busy),
+    view_family_management(families, management, busy),
     html.section([attribute.class("panel")], [
       html.h3([], [html.text("Roster")]),
       html.input([
@@ -518,13 +617,68 @@ fn view_dashboard(
 }
 
 fn view_family_management(
-  //families: List(AdminFamily),
-  _management: ManagementForm,
-  _busy: Bool,
+  families: List(AdminFamily),
+  management: ManagementForm,
+  busy: Bool,
 ) {
   html.section([attribute.class("panel family-management")], [
     html.div([attribute.class("family-management-head")], [
-      html.div([], [html.h3([], [html.text("Families")])]),
+      html.div([], [
+        html.h3([], [html.text("Families")]),
+        html.p([], [
+          html.text(
+            int.to_string(list.length(families))
+            <> " families. IDs and private voting tokens are generated automatically.",
+          ),
+        ]),
+      ]),
+      html.button(
+        [
+          attribute.class("btn btn-primary"),
+          attribute.disabled(busy),
+          event.on_click(StartNewFamily),
+        ],
+        [html.text("Add family")],
+      ),
+    ]),
+    view_management_form(management, busy),
+  ])
+}
+
+fn view_management_form(form: ManagementForm, busy: Bool) {
+  let ManagementForm(mode, email) = form
+  let title = case mode {
+    NewFamily -> "Add family"
+  }
+  html.div([attribute.class("management-form")], [
+    html.h4([], [html.text(title)]),
+    case mode {
+      NewFamily ->
+        html.label([], [
+          html.text("Parent or family email"),
+          html.input([
+            attribute.type_("email"),
+            attribute.value(email),
+            attribute.autocomplete("email"),
+            attribute.disabled(busy),
+          ]),
+        ])
+    },
+    html.div([attribute.class("management-actions")], [
+      html.button(
+        [
+          attribute.class("btn btn-primary"),
+          attribute.disabled(busy),
+        ],
+        [html.text("Save")],
+      ),
+      html.button(
+        [
+          attribute.class("btn btn-ghost"),
+          attribute.disabled(busy),
+        ],
+        [html.text("Cancel")],
+      ),
     ]),
   ])
 }

@@ -236,10 +236,13 @@ pub fn add_family_decoder() -> decode.Decoder(String) {
 // Get Admin Families
 // -----------------------------------------------------------------------------
 pub fn get_admin_families(
+  jwt: String,
   message: fn(Result(List(AdminFamily), rsvp.Error(String))) -> msg,
 ) -> effect.Effect(msg) {
-  supabase.get_json(
+  supabase.post_json_with_auth(
     "/rest/v1/rpc/get_admin_families",
+    jwt,
+    "{}",
     admin_family_decoder(),
     message,
   )
