@@ -214,6 +214,122 @@ begin
 end;
 $$;
 
+-- ---------- Admin: update a family ----------
+-- Updates a family's email address while applying the same normalization and
+-- validation rules used when a family is created.
+create or replace function update_family(
+  p_family_id uuid,
+  p_family_email text
+)
+returns table (
+  family_id uuid,
+  family_email text,
+  family_token uuid
+)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  normalized_email text := lower(trim(p_family_email));
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  if p_family_id is null then
+    raise exception 'invalid family id' using errcode = '22023';
+  end if;
+
+  if normalized_email is null
+    or normalized_email !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
+  then
+    raise exception 'invalid family email' using errcode = '22023';
+  end if;
+
+  return query
+    update public.families as family
+    set email = normalized_email
+    where family.id = p_family_id
+    returning family.id, family.email, family.family_token;
+
+  if not found then
+    raise exception 'family not found' using errcode = 'P0002';
+  end if;
+end;
+$$;
+
+-- ---------- Admin: delete a family ----------
+-- Deletes the family, its swimmers, and votes cast by or for those swimmers.
+-- If another family's swimmer voted for a deleted swimmer, their has_voted
+-- flag is reset so they can vote again.
+create or replace function delete_family(p_family_id uuid)
+returns table (
+  family_id uuid,
+  family_email text,
+  family_token uuid
+)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  deleted_id uuid;
+  deleted_email text;
+  deleted_token uuid;
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  if p_family_id is null then
+    raise exception 'invalid family id' using errcode = '22023';
+  end if;
+
+  select family.id, family.email, family.family_token
+  into deleted_id, deleted_email, deleted_token
+  from public.families as family
+  where family.id = p_family_id
+  for update;
+
+  if not found then
+    raise exception 'family not found' using errcode = 'P0002';
+  end if;
+
+  perform swimmer.id
+  from public.swimmers as swimmer
+  where swimmer.family_id = p_family_id
+  for update;
+
+  with deleted_votes as (
+    delete from public.votes as vote
+    where vote.voter_id in (
+      select swimmer.id
+      from public.swimmers as swimmer
+      where swimmer.family_id = p_family_id
+    )
+    or vote.candidate_id in (
+      select swimmer.id
+      from public.swimmers as swimmer
+      where swimmer.family_id = p_family_id
+    )
+    returning vote.voter_id
+  )
+  update public.swimmers as swimmer
+  set has_voted = false
+  where swimmer.id in (select voter_id from deleted_votes)
+    and swimmer.family_id <> p_family_id;
+
+  delete from public.swimmers as swimmer
+  where swimmer.family_id = p_family_id;
+
+  delete from public.families as family
+  where family.id = p_family_id;
+
+  return query select deleted_id, deleted_email, deleted_token;
+end;
+$$;
+
 -- ---------- Admin: list families ----------
 -- Returns one row per family with its swimmers nested as JSON. Families with
 -- no swimmers are included with an empty swimmers array.
@@ -290,6 +406,10 @@ grant execute on function get_results() to authenticated;
 grant execute on function set_voting_open(boolean) to authenticated;
 revoke execute on function add_family(text) from public, anon;
 grant execute on function add_family(text) to authenticated;
+revoke execute on function update_family(uuid, text) from public, anon;
+grant execute on function update_family(uuid, text) to authenticated;
+revoke execute on function delete_family(uuid) from public, anon;
+grant execute on function delete_family(uuid) to authenticated;
 revoke execute on function get_admin_families() from public, anon;
 grant execute on function get_admin_families() to authenticated;
 grant execute on function get_admin_roster() to authenticated;
